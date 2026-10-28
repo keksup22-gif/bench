@@ -52,7 +52,6 @@ local W = Rayfield:CreateWindow({
     KeySystem = false,
 })
 
--- БЕЗ ИКОНОК ВООБЩЕ
 local TabTgt  = W:CreateTab("Target")
 local TabBlob = W:CreateTab("Blobman")
 local TabDef  = W:CreateTab("Defense")
@@ -84,10 +83,27 @@ local function plist()
     for _, p in ipairs(P:GetPlayers()) do if p ~= LP then table.insert(t, p.DisplayName .. " (" .. p.Name .. ")") end end
     return t
 end
-local function pick(s)
-    if not s or s == "" or s == "None" then return nil end
-    return P:FindFirstChild(s:match("%((.-)%)") or s)
+
+-- ФИКС: Универсальный парсер строки из таблицы/словаря/строки
+local function getStr(v)
+    local s = v
+    if type(v) == "table" then 
+        s = v[1] or next(v) 
+        if type(s) == "table" then s = s[1] or next(s) end
+    end
+    if type(s) ~= "string" then return nil end
+    if s == "" or s == "None" then return nil end
+    local match = s:match("%((.-)%)")
+    if match then s = match end
+    return s
 end
+
+local function pick(v)
+    local s = getStr(v)
+    if s then return P:FindFirstChild(s) end
+    return nil
+end
+
 local function notify(t, d, dur)
     pcall(function()
         Rayfield:Notify({ Title = tostring(t or "bench"), Content = tostring(d or ""), Duration = dur or 3 })
@@ -99,7 +115,9 @@ TabTgt:CreateSection("Target Select")
 local targetDrop = TabTgt:CreateDropdown({
     Name = "Target", Options = plist(), CurrentOption = "None",
     MultipleOptions = false, Flag = "targetPick",
-    Callback = function(v) S.target = pick(v) end,
+    Callback = function(v) 
+        pcall(function() S.target = pick(v) end)
+    end,
 })
 P.PlayerAdded:Connect(function() task.defer(function() pcall(function() targetDrop:Refresh(plist(), true) end) end) end)
 P.PlayerRemoving:Connect(function(p)
@@ -273,7 +291,7 @@ end
 TabTgt:CreateDropdown({
     Name = "Loop Method", Options = { "Kick", "Lock", "Kill", "Void", "Heaven" },
     CurrentOption = "Kick", MultipleOptions = false, Flag = "loopMethod",
-    Callback = function(v) Loop.method = v end,
+    Callback = function(v) Loop.method = getStr(v) or "Kick" end,
 })
 TabTgt:CreateSlider({
     Name = "Lock Height", Range = { 3, 40 }, Increment = 1, Suffix = "",
@@ -402,7 +420,7 @@ end
 TabBlob:CreateDropdown({
     Name = "Blob Method", Options = { "Kick", "Lock", "Void", "Kill" },
     CurrentOption = "Kick", MultipleOptions = false, Flag = "blobM",
-    Callback = function(v) Blob.method = v end,
+    Callback = function(v) Blob.method = getStr(v) or "Kick" end,
 })
 TabBlob:CreateToggle({
     Name = "Blobman Loop", CurrentValue = false, Flag = "blobT",
@@ -610,7 +628,7 @@ local AK = { on = false, mode = "Default" }
 TabDef:CreateDropdown({
     Name = "Anti Kick Item", Options = { "Default", "Pickaxe", "Kunai" },
     CurrentOption = "Default", MultipleOptions = false, Flag = "akM",
-    Callback = function(v) AK.mode = v end,
+    Callback = function(v) AK.mode = getStr(v) or "Default" end,
 })
 TabDef:CreateToggle({
     Name = "Anti Kick", CurrentValue = false, Flag = "akT",
