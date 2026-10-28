@@ -44,7 +44,7 @@ local DT = MT:WaitForChild("DestroyToy")
 local SE = REP:WaitForChild("PlayerEvents"):WaitForChild("StickyPartEvent")
 local BE = REP:WaitForChild("BombEvents"):WaitForChild("BombExplode")
 
--- ИСПРАВЛЕНИЕ: иконки теперь строки "rbxassetid://..."
+-- ИСПРАВЛЕНИЕ: используем стандартные текстовые иконки Lucide
 local W = Rayfield:CreateWindow({
     Name = "bench",
     LoadingTitle = "bench",
@@ -53,12 +53,12 @@ local W = Rayfield:CreateWindow({
     KeySystem = false,
 })
 
-local TabTgt  = W:CreateTab("Target", "rbxassetid://4483362458")
-local TabBlob = W:CreateTab("Blobman", "rbxassetid://4483362458")
-local TabDef  = W:CreateTab("Defense", "rbxassetid://4483362458")
-local TabVis  = W:CreateTab("Visual", "rbxassetid://4483362458")
-local TabSrv  = W:CreateTab("Server", "rbxassetid://4483362458")
-local TabMisc = W:CreateTab("Misc", "rbxassetid://4483362458")
+local TabTgt  = W:CreateTab("Target", "target")
+local TabBlob = W:CreateTab("Blobman", "users")
+local TabDef  = W:CreateTab("Defense", "shield")
+local TabVis  = W:CreateTab("Visual", "eye")
+local TabSrv  = W:CreateTab("Server", "server")
+local TabMisc = W:CreateTab("Misc", "settings")
 
 local S = { target = nil }
 
@@ -92,7 +92,7 @@ local function pick(s)
 end
 local function notify(t, d, dur)
     pcall(function()
-        Rayfield:Notify({ Title = tostring(t or "bench"), Content = tostring(d or ""), Duration = dur or 3, Image = "rbxassetid://4483362458" })
+        Rayfield:Notify({ Title = tostring(t or "bench"), Content = tostring(d or ""), Duration = dur or 3, Image = "info" })
     end)
 end
 
