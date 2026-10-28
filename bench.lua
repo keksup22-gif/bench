@@ -1,5 +1,4 @@
--- bench.lua — one file, ready to paste
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"))()
+-- bench.lua — Rayfield version, one file
 local P  = game:GetService("Players")
 local RS = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -23,15 +22,22 @@ local DT = MT:WaitForChild("DestroyToy")
 local SE = REP:WaitForChild("PlayerEvents"):WaitForChild("StickyPartEvent")
 local BE = REP:WaitForChild("BombEvents"):WaitForChild("BombExplode")
 
-local W = Library:CreateWindow({ Title = "bench", Center = true, AutoShow = true, TabPadding = 8, MenuFadeTime = 0.2 })
-local T = {
-    Tgt  = W:AddTab("Target"),
-    Blob = W:AddTab("Blobman"),
-    Def  = W:AddTab("Defense"),
-    Vis  = W:AddTab("Visual"),
-    Srv  = W:AddTab("Server"),
-    Misc = W:AddTab("Misc"),
-}
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local W = Rayfield:CreateWindow({
+    Name = "bench",
+    LoadingTitle = "bench",
+    LoadingSubtitle = "loading",
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false,
+})
+
+local TabTgt  = W:CreateTab("Target",   4483362458)
+local TabBlob = W:CreateTab("Blobman",  4483362458)
+local TabDef  = W:CreateTab("Defense",  4483362458)
+local TabVis  = W:CreateTab("Visual",   4483362458)
+local TabSrv  = W:CreateTab("Server",   4483362458)
+local TabMisc = W:CreateTab("Misc",     4483362458)
 
 local S = { target = nil }
 
@@ -53,28 +59,38 @@ local function vis(on)
     end
 end
 local function plist()
-    local t = {}
+    local t = { "None" }
     for _, p in ipairs(P:GetPlayers()) do if p ~= LP then table.insert(t, p.DisplayName .. " (" .. p.Name .. ")") end end
-    table.sort(t); return t
+    return t
 end
 local function pick(s)
-    if not s or s == "" then return nil end
+    if not s or s == "" or s == "None" then return nil end
     return P:FindFirstChild(s:match("%((.-)%)") or s)
 end
+local function notify(t, d, dur)
+    pcall(function()
+        Rayfield:Notify({ Title = tostring(t or "bench"), Content = tostring(d or ""), Duration = dur or 3, Image = 4483362458 })
+    end)
+end
 
--- === Target list ===
-local tgtBox = T.Tgt:AddLeftGroupbox("Target")
-local targetDrop = tgtBox:AddDropdown("tgtPick", {
-    Values = plist(), Default = nil, Multi = false,
+-- ========== TARGET ==========
+local pickSec = TabTgt:CreateSection("Target")
+local targetDrop = pickSec:CreateDropdown({
+    Name = "Target", Options = plist(), CurrentOption = "None",
+    MultipleOptions = false, Flag = "targetPick",
     Callback = function(v) S.target = pick(v) end,
 })
-P.PlayerAdded:Connect(function() task.defer(function() targetDrop:Refresh(plist(), true) end) end)
+
+P.PlayerAdded:Connect(function()
+    task.defer(function() pcall(function() targetDrop:Refresh(plist(), true) end) end)
+end)
 P.PlayerRemoving:Connect(function(p)
     if S.target == p then S.target = nil end
-    task.defer(function() targetDrop:Refresh(plist(), true) end)
+    task.defer(function() pcall(function() targetDrop:Refresh(plist(), true) end) end)
 end)
 
-local methodBox = T.Tgt:AddRightGroupbox("Ghost Grab")
+-- Ghost Grab
+local ghostSec = TabTgt:CreateSection("Ghost Grab")
 local Ghost = { on = false, clone = nil, bp = nil, bg = nil }
 
 local function ghostStop()
@@ -139,24 +155,30 @@ local function ghostStart()
     end)
 end
 
-methodBox:AddToggle("ghostT", {
-    Text = "Ghost Grab", Default = false,
+local ghostToggle = ghostSec:CreateToggle({
+    Name = "Ghost Grab", CurrentValue = false, Flag = "ghostGrab",
     Callback = function(on)
         if on and S.target then ghostStart() else ghostStop() end
     end,
-}):AddKeyPicker("ghostB", {
-    Default = "F", Callback = function(st)
-        if st and S.target then
-            local g = methodBox:GetToggle("ghostT")
-            g:Set(not g:Get())
+})
+
+ghostSec:CreateKeybind({
+    Name = "Ghost Grab Bind", CurrentKeybind = "F", HoldToInteract = false, Flag = "ghostBind",
+    Callback = function()
+        if S.target then
+            local next = not Ghost.on
+            pcall(function() ghostToggle:Set(next) end)
+            if next then ghostStart() else ghostStop() end
         end
     end,
 })
 
--- === Snowball ===
+-- Snowball Ragdoll
+local snowSec = TabTgt:CreateSection("Snowball")
 local Snow = { on = false }
-methodBox:AddToggle("snowT", {
-    Text = "Snowball Ragdoll", Default = false,
+
+snowSec:CreateToggle({
+    Name = "Snowball Ragdoll", CurrentValue = false, Flag = "snowT",
     Callback = function(on)
         Snow.on = on
         if not on then return end
@@ -191,15 +213,10 @@ methodBox:AddToggle("snowT", {
             end
         end)
     end,
-}):AddKeyPicker("snowB", {
-    Default = "M", Callback = function(st)
-        if st and S.target then
-            local g = methodBox:GetToggle("snowT"); g:Set(not g:Get())
-        end
-    end,
 })
 
--- === Loop Target ===
+-- Loop Target
+local loopSec = TabTgt:CreateSection("Loop Target")
 local Loop = { on = false, method = "Kick", height = 10, slots = {} }
 
 local function loopClear(plr)
@@ -251,38 +268,44 @@ local function loopTick()
     end
 end
 
-methodBox:AddDropdown("loopM", {
-    Values = { "Kick", "Lock", "Kill", "Void", "Heaven" }, Default = "Kick",
+loopSec:CreateDropdown({
+    Name = "Loop Method", Options = { "Kick", "Lock", "Kill", "Void", "Heaven" },
+    CurrentOption = "Kick", MultipleOptions = false, Flag = "loopMethod",
     Callback = function(v) Loop.method = v end,
 })
-methodBox:AddSlider("loopH", {
-    Text = "Lock Height", Min = 3, Max = 40, Default = 10,
+loopSec:CreateSlider({
+    Name = "Lock Height", Range = { 3, 40 }, Increment = 1, Suffix = "",
+    CurrentValue = 10, Flag = "loopHeight",
     Callback = function(v) Loop.height = v end,
 })
-methodBox:AddToggle("loopT", {
-    Text = "Loop Target", Default = false,
+
+local loopToggle = loopSec:CreateToggle({
+    Name = "Loop Target", CurrentValue = false, Flag = "loopActive",
     Callback = function(on)
         Loop.on = on
         if on then
-            if not S.target then Library:Notify({ Title = "bench", Description = "pick target", Time = 2 }); return end
+            if not S.target then notify("bench", "pick target first"); return end
             task.spawn(function()
                 while Loop.on do pcall(loopTick); task.wait(0.03) end
                 loopClearAll()
             end)
         else loopClearAll() end
     end,
-}):AddKeyPicker("loopB", {
-    Default = "F", Callback = function(st)
-        if st then local g = methodBox:GetToggle("loopT"); g:Set(not g:Get()) end
+})
+loopSec:CreateKeybind({
+    Name = "Loop Bind", CurrentKeybind = "F", HoldToInteract = false, Flag = "loopBind",
+    Callback = function()
+        local next = not Loop.on
+        pcall(function() loopToggle:Set(next) end)
     end,
 })
 
--- === Grab Mods ===
-local Grab = T.Tgt:AddRightGroupbox("Grab Mods")
-local Anchor = { on = false, parts = {} }
+-- Grab Mods
+local grabSec = TabTgt:CreateSection("Grab Mods")
+local Anchor = { parts = {} }
 
-Grab:AddToggle("massT", {
-    Text = "Massless Grab", Default = false,
+grabSec:CreateToggle({
+    Name = "Massless Grab", CurrentValue = false, Flag = "massT",
     Callback = function(on)
         if not on then return end
         WS.ChildAdded:Connect(function(c)
@@ -304,8 +327,8 @@ Grab:AddToggle("massT", {
     end,
 })
 
-Grab:AddToggle("killGrabT", {
-    Text = "Kill Grab", Default = false,
+grabSec:CreateToggle({
+    Name = "Kill Grab", CurrentValue = false, Flag = "killGrabT",
     Callback = function(on)
         if not on then return end
         WS.ChildAdded:Connect(function(c)
@@ -332,95 +355,126 @@ Grab:AddToggle("killGrabT", {
     end,
 })
 
-Grab:AddToggle("anchorT", {
-    Text = "Anchor Grab", Default = false,
+grabSec:CreateToggle({
+    Name = "Anchor Grab", CurrentValue = false, Flag = "anchorT",
     Callback = function(on)
-        Anchor.on = on
-        if on then
-            WS.ChildAdded:Connect(function(c)
-                if c.Name ~= "GrabParts" then return end
-                task.wait(0.05)
-                local gp = c:FindFirstChild("GrabPart")
-                local wc = gp and gp:FindFirstChild("WeldConstraint")
-                local p1 = wc and wc.Part1
-                if not p1 or not p1.Parent then return end
-                local main = p1.Parent:FindFirstChild("SoundPart") or p1.Parent:FindFirstChild("Main") or p1
-                for _, ch in ipairs(main:GetChildren()) do
-                    if ch:IsA("BodyPosition") or ch:IsA("BodyGyro") then ch:Destroy() end
-                end
-                local bp = Instance.new("BodyPosition", main)
-                bp.Position = main.Position; bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge); bp.D = 100
-                local bg = Instance.new("BodyGyro", main)
-                bg.CFrame = main.CFrame; bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge); bg.D = 100
-                Anchor.parts[p1.Parent] = { bp = bp, bg = bg }
-            end)
-        else
-            for _, d in pairs(Anchor.parts) do pcall(function() d.bp:Destroy() end); pcall(function() d.bg:Destroy() end) end
+        if not on then
+            for _, d in pairs(Anchor.parts) do
+                pcall(function() d.bp:Destroy() end)
+                pcall(function() d.bg:Destroy() end)
+            end
             Anchor.parts = {}
+            return
         end
+        WS.ChildAdded:Connect(function(c)
+            if c.Name ~= "GrabParts" then return end
+            task.wait(0.05)
+            local gp = c:FindFirstChild("GrabPart")
+            local wc = gp and gp:FindFirstChild("WeldConstraint")
+            local p1 = wc and wc.Part1
+            if not p1 or not p1.Parent then return end
+            local main = p1.Parent:FindFirstChild("SoundPart") or p1.Parent:FindFirstChild("Main") or p1
+            for _, ch in ipairs(main:GetChildren()) do
+                if ch:IsA("BodyPosition") or ch:IsA("BodyGyro") then ch:Destroy() end
+            end
+            local bp = Instance.new("BodyPosition", main)
+            bp.Position = main.Position; bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge); bp.D = 100
+            local bg = Instance.new("BodyGyro", main)
+            bg.CFrame = main.CFrame; bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge); bg.D = 100
+            Anchor.parts[p1.Parent] = { bp = bp, bg = bg }
+        end)
     end,
 })
 
--- === Control Player ===
-local Ctrl = { on = false, creature = nil, bv = nil, rayP = RaycastParams.new() }
-Ctrl.rayP.FilterType = Enum.RaycastFilterType.Exclude
+-- ========== BLOBMAN ==========
+local blobSec = TabBlob:CreateSection("Blobman Loop")
+local Blob = { on = false, method = "Kick" }
 
-local function ctrlStop()
-    Ctrl.on = false
-    if Ctrl.creature then
-        local ch = Ctrl.creature:FindFirstChildOfClass("Humanoid")
-        if ch then ch.WalkSpeed = 16; ch.PlatformStand = false end
-        Ctrl.creature = nil
-    end
-    if Ctrl.bv then Ctrl.bv:Destroy(); Ctrl.bv = nil end
-    local h = hum(); if h then WS.CurrentCamera.CameraSubject = h end
+local function getBlob()
+    local h = hum(); local s = h and h.SeatPart
+    if s and s.Parent and s.Parent.Name == "CreatureBlobman" then return s.Parent end
+    local i = inv(); return i and i:FindFirstChild("CreatureBlobman")
 end
 
-T.Misc:AddLeftGroupbox("Control"):AddToggle("ctrlT", {
-    Text = "Control Player (V)", Default = false,
+local function blobBS(b)
+    if not b then return end
+    local sc = b:FindFirstChild("BlobmanSeatAndOwnerScript"); if not sc then return end
+    local g = sc:FindFirstChild("CreatureGrab")
+    local r = sc:FindFirstChild("CreatureRelease") or sc:FindFirstChild("CreatureDrop")
+    local rd = b:FindFirstChild("RightDetector"); local ld = b:FindFirstChild("LeftDetector")
+    if not (g and r and rd and ld) then return end
+    return { g=g, r=r, rd=rd, ld=ld, rw=rd:FindFirstChild("RightWeld"), lw=ld:FindFirstChild("LeftWeld"), hrp=b:FindFirstChild("HumanoidRootPart"), seat=b:FindFirstChild("VehicleSeat") }
+end
+
+blobSec:CreateDropdown({
+    Name = "Blob Method", Options = { "Kick", "Lock", "Void", "Kill" },
+    CurrentOption = "Kick", MultipleOptions = false, Flag = "blobM",
+    Callback = function(v) Blob.method = v end,
+})
+
+blobSec:CreateToggle({
+    Name = "Blobman Loop", CurrentValue = false, Flag = "blobT",
     Callback = function(on)
-        if not on then ctrlStop(); return end
-        local me = chr(); local mh = hrp()
-        if not me or not mh then return end
-        local head = me:FindFirstChild("Head"); if not head then return end
-        Ctrl.rayP.FilterDescendantsInstances = { me }
-        local hit = WS:Raycast(head.Position, WS.CurrentCamera.CFrame.LookVector * 100, Ctrl.rayP)
-        if not hit then return end
-        local tgt = hit.Instance
-        while tgt and not tgt:FindFirstChildOfClass("Humanoid") do tgt = tgt.Parent end
-        if not tgt then return end
-        local th = tgt.Humanoid; local t = tgt:FindFirstChild("HumanoidRootPart")
-        if not th or not t or th.Health <= 0 then return end
-        sno(t); line(t)
-        th.WalkSpeed = 0
-        Ctrl.creature = tgt; Ctrl.on = true
-        local bv = Instance.new("BodyVelocity", mh)
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge); bv.Velocity = Vector3.zero
-        Ctrl.bv = bv
-        WS.CurrentCamera.CameraSubject = th
-        local conn = RS.Heartbeat:Connect(function()
-            if not Ctrl.on or not th.Parent or not hum() then conn:Disconnect(); return end
-            bv.Velocity = hum().MoveDirection * 20
-            t.CFrame = mh.CFrame + Vector3.new(0, -3, 0)
-        end)
-        local jc = UIS.JumpRequest:Connect(function()
-            if Ctrl.on and th.Parent then th:ChangeState(Enum.HumanoidStateType.Jumping) end
-        end)
+        Blob.on = on
+        if not on then return end
         task.spawn(function()
-            while Ctrl.on and th.Parent and th.Health > 0 do task.wait() end
-            jc:Disconnect(); if conn.Connected then conn:Disconnect() end; ctrlStop()
+            while Blob.on do
+                RS.Heartbeat:Wait()
+                local h = hum(); local me = hrp()
+                if not h or not me then task.wait(0.1)
+                else
+                    local blob = getBlob()
+                    if not blob then
+                        if LP:FindFirstChild("CanSpawnToy") and LP.CanSpawnToy.Value then
+                            pcall(function() SP:InvokeServer("CreatureBlobman", me.CFrame * CFrame.new(0, 15, 20), Vector3.zero) end)
+                        end
+                        task.wait(0.5)
+                    else
+                        local bs = blobBS(blob)
+                        if bs and bs.seat and h.SeatPart ~= bs.seat then
+                            me.CFrame = bs.seat.CFrame * CFrame.new(0, 2, 0); zer(me)
+                            task.wait(0.05)
+                            pcall(function() bs.seat:Sit(h) end)
+                            task.wait(0.3)
+                        elseif bs then
+                            local plr = S.target; local t = thrp(plr); local th = thum(plr)
+                            if t and th and th.Health > 0 and bs.hrp then
+                                if (bs.hrp.Position - t.Position).Magnitude > 25 then
+                                    bs.hrp.CFrame = t.CFrame; zer(bs.hrp)
+                                end
+                                pcall(function() bs.g:FireServer(bs.rd, t, bs.rw) end)
+                                if Blob.method == "Kick" then
+                                    pcall(function() bs.r:FireServer(bs.rw) end)
+                                    th.Sit = true; zer(t); task.wait(0.02); th.Sit = false
+                                elseif Blob.method == "Void" then
+                                    sno(t); t.AssemblyLinearVelocity = Vector3.new(0, -1e8, 0); kline(t)
+                                elseif Blob.method == "Kill" then
+                                    pcall(function() bs.r:FireServer(bs.rw, t) end)
+                                    pcall(function() th:ChangeState(Enum.HumanoidStateType.Dead) end)
+                                    task.wait(0.1)
+                                    if th.Parent and th.Health > 0 then pcall(function() th.Health = 0 end) end
+                                elseif Blob.method == "Lock" then
+                                    if not t:FindFirstChild("BenchBlobLock") then
+                                        local bp = Instance.new("BodyPosition", t)
+                                        bp.Name = "BenchBlobLock"
+                                        bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge); bp.D = 100
+                                        bp.Position = bs.hrp.Position + Vector3.new(0, 10, 0)
+                                    else
+                                        t.BenchBlobLock.Position = bs.hrp.Position + Vector3.new(0, 10, 0)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
         end)
-    end,
-}):AddKeyPicker("ctrlB", {
-    Default = "V", Callback = function(st)
-        if st then
-            local g = T.Misc:GetGroupbox and T.Misc:GetGroupbox("Control")
-            if g then local tg = g:GetToggle("ctrlT"); tg:Set(not tg:Get()) end
-        end
     end,
 })
 
--- === Anti-Grab ===
+-- ========== DEFENSE ==========
+-- Anti Grab
+local agSec = TabDef:CreateSection("Anti Grab")
 local AG = { on = false, held = false, conns = {}, rayP = RaycastParams.new() }
 AG.rayP.FilterType = Enum.RaycastFilterType.Exclude
 
@@ -469,8 +523,8 @@ local function agSetup(c)
     end
 end
 
-T.Def:AddLeftGroupbox("Anti Grab"):AddToggle("agT", {
-    Text = "Anti Grab (raycast)", Default = false,
+agSec:CreateToggle({
+    Name = "Anti Grab (raycast)", CurrentValue = false, Flag = "agT",
     Callback = function(on)
         AG.on = on; agClear()
         if on then
@@ -482,13 +536,12 @@ T.Def:AddLeftGroupbox("Anti Grab"):AddToggle("agT", {
     end,
 })
 
--- === Anti Snowball / Bomb / Paint ===
-T.Def:AddLeftGroupbox("Anti Snow/Bomb/Paint")
-
+-- Anti Snowball
 local AS = { on = false, last = 0, conns = {} }
-T.Def:GetGroupbox and nil
-T.Def:AddLeftGroupbox("Anti Snow/Bomb/Paint"):AddToggle("asT", {
-    Text = "Anti Snowball", Default = false,
+local assSec = TabDef:CreateSection("Anti Snowball")
+
+assSec:CreateToggle({
+    Name = "Anti Snowball", CurrentValue = false, Flag = "asT",
     Callback = function(on)
         AS.on = on
         for _, c in ipairs(AS.conns) do pcall(function() c:Disconnect() end) end; AS.conns = {}
@@ -523,32 +576,39 @@ T.Def:AddLeftGroupbox("Anti Snow/Bomb/Paint"):AddToggle("asT", {
     end,
 })
 
-T.Def:AddLeftGroupbox("Anti Snow/Bomb/Paint"):AddToggle("abT", {
-    Text = "Anti Explode", Default = false,
+-- Anti Explode
+local AB = { on = false, conn = nil }
+local abSec = TabDef:CreateSection("Anti Explode")
+
+abSec:CreateToggle({
+    Name = "Anti Explode", CurrentValue = false, Flag = "abT",
     Callback = function(on)
+        AB.on = on
         if on then
-            task.spawn(function()
-                local c = WS.ChildAdded:Connect(function(ch)
-                    if ch.Name ~= "Part" or not ch:IsA("BasePart") then return end
-                    local t = hrp(); local h = hum()
-                    if not t or not h then return end
-                    if (ch.Position - t.Position).Magnitude < 40 then
-                        t.Anchored = true; task.wait(0.01); t.Anchored = false
-                        zer(t); h:ChangeState(Enum.HumanoidStateType.Running)
-                    end
-                end)
-                while on do task.wait() end
-                c:Disconnect()
+            AB.conn = WS.ChildAdded:Connect(function(ch)
+                if not AB.on or ch.Name ~= "Part" or not ch:IsA("BasePart") then return end
+                local t = hrp(); local h = hum()
+                if not t or not h then return end
+                if (ch.Position - t.Position).Magnitude < 40 then
+                    t.Anchored = true; task.wait(0.01); t.Anchored = false
+                    zer(t); h:ChangeState(Enum.HumanoidStateType.Running)
+                end
             end)
+        elseif AB.conn then
+            AB.conn:Disconnect(); AB.conn = nil
         end
     end,
 })
 
-T.Def:AddLeftGroupbox("Anti Snow/Bomb/Paint"):AddToggle("apT", {
-    Text = "Anti Paint/Poison", Default = false,
+-- Anti Paint
+local AP = { conn = nil }
+local apSec = TabDef:CreateSection("Anti Paint")
+
+apSec:CreateToggle({
+    Name = "Anti Paint/Poison", CurrentValue = false, Flag = "apT",
     Callback = function(on)
         if on then
-            WS.DescendantAdded:Connect(function(d)
+            AP.conn = WS.DescendantAdded:Connect(function(d)
                 if d.Name == "PaintPlayerPart" or d.Name == "PainPlayerPart" then
                     task.defer(function() if d and d.Parent then d:Destroy() end end)
                 end
@@ -556,27 +616,29 @@ T.Def:AddLeftGroupbox("Anti Snow/Bomb/Paint"):AddToggle("apT", {
             for _, d in ipairs(WS:GetDescendants()) do
                 if d.Name == "PaintPlayerPart" or d.Name == "PainPlayerPart" then d:Destroy() end
             end
+        elseif AP.conn then
+            AP.conn:Disconnect(); AP.conn = nil
         end
     end,
 })
 
--- === Anti-Kick ===
+-- Anti Kick
 local AKCfg = {
     Default = { name = "NinjaShuriken", off = CFrame.new(0,0,0) * CFrame.Angles(0, math.pi/2, math.pi/2), target = "Fire" },
     Pickaxe = { name = "ToolPickaxe", off = CFrame.new(-0.25, 0.45, 0.78) * CFrame.Angles(-math.pi/2, -math.pi/4, 0), target = "Torso" },
     Kunai   = { name = "NinjaKunai", off = CFrame.new(0, -1.2, 0) * CFrame.Angles(0, math.pi/2, math.pi/2), target = "Fire" },
 }
 local AK = { on = false, mode = "Default" }
+local akSec = TabDef:CreateSection("Anti Kick")
 
-T.Def:AddRightGroupbox("Anti Kick")
-
-T.Def:GetGroupbox and nil
-T.Def:AddRightGroupbox("Anti Kick"):AddDropdown("akM", {
-    Values = { "Default", "Pickaxe", "Kunai" }, Default = "Default",
+akSec:CreateDropdown({
+    Name = "Anti Kick Item", Options = { "Default", "Pickaxe", "Kunai" },
+    CurrentOption = "Default", MultipleOptions = false, Flag = "akM",
     Callback = function(v) AK.mode = v end,
 })
-T.Def:AddRightGroupbox("Anti Kick"):AddToggle("akT", {
-    Text = "Anti Kick", Default = false,
+
+akSec:CreateToggle({
+    Name = "Anti Kick", CurrentValue = false, Flag = "akT",
     Callback = function(on)
         AK.on = on
         if not on then
@@ -630,93 +692,9 @@ T.Def:AddRightGroupbox("Anti Kick"):AddToggle("akT", {
     end,
 })
 
--- === Blobman ===
-local Blob = { on = false, method = "Kick" }
-
-local function getBlob()
-    local h = hum(); local s = h and h.SeatPart
-    if s and s.Parent and s.Parent.Name == "CreatureBlobman" then return s.Parent end
-    local i = inv(); return i and i:FindFirstChild("CreatureBlobman")
-end
-
-local function blobBS(b)
-    if not b then return end
-    local sc = b:FindFirstChild("BlobmanSeatAndOwnerScript"); if not sc then return end
-    local g = sc:FindFirstChild("CreatureGrab")
-    local r = sc:FindFirstChild("CreatureRelease") or sc:FindFirstChild("CreatureDrop")
-    local rd = b:FindFirstChild("RightDetector"); local ld = b:FindFirstChild("LeftDetector")
-    if not (g and r and rd and ld) then return end
-    return { g=g, r=r, rd=rd, ld=ld, rw=rd:FindFirstChild("RightWeld"), lw=ld:FindFirstChild("LeftWeld"), hrp=b:FindFirstChild("HumanoidRootPart"), seat=b:FindFirstChild("VehicleSeat") }
-end
-
-T.Blob:AddLeftGroupbox("Blob Loop")
-
-T.Blob:GetGroupbox and nil
-T.Blob:AddLeftGroupbox("Blob Loop"):AddDropdown("blM", {
-    Values = { "Kick", "Lock", "Void", "Kill" }, Default = "Kick",
-    Callback = function(v) Blob.method = v end,
-})
-
-T.Blob:AddLeftGroupbox("Blob Loop"):AddToggle("blT", {
-    Text = "Blobman Loop", Default = false,
-    Callback = function(on)
-        Blob.on = on
-        if not on then return end
-        task.spawn(function()
-            while Blob.on do
-                RS.Heartbeat:Wait()
-                local h = hum(); local me = hrp(); if not h or not me then task.wait(0.1) else
-                    local blob = getBlob()
-                    if not blob then
-                        if LP:FindFirstChild("CanSpawnToy") and LP.CanSpawnToy.Value then
-                            pcall(function() SP:InvokeServer("CreatureBlobman", me.CFrame * CFrame.new(0, 15, 20), Vector3.zero) end)
-                        end
-                        task.wait(0.5)
-                    else
-                        local bs = blobBS(blob)
-                        if bs and bs.seat and h.SeatPart ~= bs.seat then
-                            me.CFrame = bs.seat.CFrame * CFrame.new(0, 2, 0); zer(me)
-                            task.wait(0.05)
-                            pcall(function() bs.seat:Sit(h) end)
-                            task.wait(0.3)
-                        elseif bs then
-                            local plr = S.target; local t = thrp(plr); local th = thum(plr)
-                            if t and th and th.Health > 0 and bs.hrp then
-                                if (bs.hrp.Position - t.Position).Magnitude > 25 then
-                                    bs.hrp.CFrame = t.CFrame; zer(bs.hrp)
-                                end
-                                pcall(function() bs.g:FireServer(bs.rd, t, bs.rw) end)
-                                if Blob.method == "Kick" then
-                                    pcall(function() bs.r:FireServer(bs.rw) end)
-                                    th.Sit = true; zer(t); task.wait(0.02); th.Sit = false
-                                elseif Blob.method == "Void" then
-                                    sno(t); t.AssemblyLinearVelocity = Vector3.new(0, -1e8, 0); kline(t)
-                                elseif Blob.method == "Kill" then
-                                    pcall(function() bs.r:FireServer(bs.rw, t) end)
-                                    pcall(function() th:ChangeState(Enum.HumanoidStateType.Dead) end)
-                                    task.wait(0.1)
-                                    if th.Parent and th.Health > 0 then pcall(function() th.Health = 0 end) end
-                                elseif Blob.method == "Lock" then
-                                    if not t:FindFirstChild("BenchBlobLock") then
-                                        local bp = Instance.new("BodyPosition", t)
-                                        bp.Name = "BenchBlobLock"
-                                        bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge); bp.D = 100
-                                        bp.Position = bs.hrp.Position + Vector3.new(0, 10, 0)
-                                    else
-                                        t.BenchBlobLock.Position = bs.hrp.Position + Vector3.new(0, 10, 0)
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-    end,
-})
-
--- === Gucci Save ===
+-- Gucci Save
 local G = { busy = false, pinkCF = CFrame.new(-491, -7, -166) }
+local gSec = TabDef:CreateSection("Gucci Save")
 
 local function slideTo(cf, part)
     if not part or not part.Parent then return end
@@ -729,11 +707,9 @@ local function slideTo(cf, part)
     part.CFrame = cf
 end
 
-T.Def:AddRightGroupbox("Gucci Save")
-T.Def:GetGroupbox and nil
-T.Def:AddRightGroupbox("Gucci Save"):AddButton("gSave", {
-    Text = "Gucci Save (slide + train)",
-    Func = function()
+gSec:CreateButton({
+    Name = "Gucci Save (slide + train)",
+    Callback = function()
         if G.busy then return end
         local me = hrp(); local h = hum(); if not me or not h then return end
         G.busy = true
@@ -758,8 +734,44 @@ T.Def:AddRightGroupbox("Gucci Save"):AddButton("gSave", {
     end,
 })
 
--- === PCLD ESP ===
+-- Anti Banana
+local function abanRun()
+    local me = hrp(); local h = hum(); local c = chr()
+    if not me or not h or not c then return end
+    local ll = c:FindFirstChild("Left Leg"); local rl = c:FindFirstChild("Right Leg")
+    local t = c:FindFirstChild("Torso")
+    if not ll or not rl or not t then return end
+    local hp = h.Health; h.Health = h.MaxHealth
+    local f = WS.FallenPartsDestroyHeight; local save = t.CFrame
+    WS.FallenPartsDestroyHeight = -200000
+    pcall(function() RR:FireServer(me, 2) end); task.wait(0.5)
+    rl.CFrame = CFrame.new(0, -60000, 0); ll.CFrame = CFrame.new(0, -60000, 0)
+    task.wait(0.3); t.CFrame = CFrame.new(0, -59970, 0)
+    task.wait(0.5); t.CFrame = save; task.wait(0.5)
+    WS.FallenPartsDestroyHeight = f; h.Health = hp
+end
+
+local abnSec = TabDef:CreateSection("Anti Banana")
+abnSec:CreateButton({ Name = "Delete Legs", Callback = function() task.spawn(abanRun) end })
+abnSec:CreateToggle({
+    Name = "Auto Anti Banana", CurrentValue = false, Flag = "abnT",
+    Callback = function(on)
+        if on then
+            task.spawn(function()
+                while on do
+                    local c = chr(); local h = c and c:FindFirstChildOfClass("Humanoid")
+                    if c and h and h.Health > 0 and c:FindFirstChild("Left Leg") and c:FindFirstChild("Right Leg") then
+                        pcall(abanRun); task.wait(0.5)
+                    else task.wait(0.2) end
+                end
+            end)
+        end
+    end,
+})
+
+-- ========== VISUAL ==========
 local PCLD = { on = false, boxes = {}, fill = Color3.new(0,0,0), out = Color3.new(1,1,1) }
+local pldSec = TabVis:CreateSection("PCLD ESP")
 
 local function pldAdd(p)
     if not p:IsA("BasePart") or PCLD.boxes[p] then return end
@@ -795,11 +807,8 @@ local function pldAdd(p)
     end)
 end
 
-T.Vis:AddLeftGroupbox("PCLD")
-
-T.Vis:GetGroupbox and nil
-T.Vis:AddLeftGroupbox("PCLD"):AddToggle("pldT", {
-    Text = "PCLD ESP", Default = false,
+pldSec:CreateToggle({
+    Name = "PCLD ESP", CurrentValue = false, Flag = "pldT",
     Callback = function(on)
         PCLD.on = on
         if on then
@@ -825,30 +834,30 @@ T.Vis:AddLeftGroupbox("PCLD"):AddToggle("pldT", {
     end,
 })
 
--- === Packet Lag ===
+-- ========== SERVER ==========
 local Packet = { on = false, mb = 1, delay = 0.5, str = string.rep("bench", 1000) }
+local pkSec = TabSrv:CreateSection("Packet Lag")
 
-T.Srv:AddLeftGroupbox("Packet Lag")
-
-T.Srv:GetGroupbox and nil
-T.Srv:AddLeftGroupbox("Packet Lag"):AddSlider("pkMB", {
-    Text = "Size (MB)", Min = 1, Max = 9, Default = 1, Rounding = 1,
+pkSec:CreateSlider({
+    Name = "Size (MB)", Range = { 1, 9 }, Increment = 0.5, Suffix = "MB",
+    CurrentValue = 1, Flag = "pkMB",
     Callback = function(v) Packet.mb = v end,
 })
-T.Srv:AddLeftGroupbox("Packet Lag"):AddSlider("pkD", {
-    Text = "Delay (s)", Min = 0.1, Max = 3, Default = 0.5, Rounding = 2,
+pkSec:CreateSlider({
+    Name = "Delay (s)", Range = { 0.1, 3 }, Increment = 0.1, Suffix = "s",
+    CurrentValue = 0.5, Flag = "pkD",
     Callback = function(v) Packet.delay = v end,
 })
-T.Srv:AddLeftGroupbox("Packet Lag"):AddButton("pkOne", {
-    Text = "Send One Packet",
-    Func = function()
+pkSec:CreateButton({
+    Name = "Send One Packet",
+    Callback = function()
         local by = math.floor(Packet.mb * 1048576)
         local s = string.rep(Packet.str, math.floor(by / #Packet.str))
         pcall(function() EL:FireServer(s) end)
     end,
 })
-T.Srv:AddLeftGroupbox("Packet Lag"):AddToggle("pkT", {
-    Text = "Packet Lag", Default = false,
+pkSec:CreateToggle({
+    Name = "Packet Lag", CurrentValue = false, Flag = "pkT",
     Callback = function(on)
         Packet.on = on
         if on then
@@ -864,8 +873,8 @@ T.Srv:AddLeftGroupbox("Packet Lag"):AddToggle("pkT", {
     end,
 })
 
--- === Breakers ===
-T.Srv:AddRightGroupbox("Breakers")
+-- Break Barrier
+local brkSec = TabSrv:CreateSection("Breakers")
 
 local function barrierBreak()
     local t0 = tick(); local broken = false
@@ -886,60 +895,80 @@ local function barrierBreak()
     return broken
 end
 
-T.Srv:AddRightGroupbox("Breakers"):AddButton("brkT", {
-    Text = "Break Barrier",
-    Func = function()
+brkSec:CreateButton({
+    Name = "Break Barrier",
+    Callback = function()
         task.spawn(function()
             local ok = barrierBreak()
-            Library:Notify({ Title = "bench", Description = ok and "barrier broken" or "failed", Time = 3 })
+            notify("bench", ok and "barrier broken" or "failed", 3)
         end)
     end,
 })
 
--- === Anti Banana ===
-local function abanRun()
-    local me = hrp(); local h = hum(); local c = chr()
-    if not me or not h or not c then return end
-    local ll = c:FindFirstChild("Left Leg"); local rl = c:FindFirstChild("Right Leg")
-    local t = c:FindFirstChild("Torso")
-    if not ll or not rl or not t then return end
-    local hp = h.Health; h.Health = h.MaxHealth
-    local f = WS.FallenPartsDestroyHeight; local save = t.CFrame
-    WS.FallenPartsDestroyHeight = -200000
-    pcall(function() RR:FireServer(me, 2) end); task.wait(0.5)
-    rl.CFrame = CFrame.new(0, -60000, 0); ll.CFrame = CFrame.new(0, -60000, 0)
-    task.wait(0.3); t.CFrame = CFrame.new(0, -59970, 0)
-    task.wait(0.5); t.CFrame = save; task.wait(0.5)
-    WS.FallenPartsDestroyHeight = f; h.Health = hp
+-- ========== MISC ==========
+local Ctrl = { on = false, creature = nil, bv = nil, rayP = RaycastParams.new() }
+Ctrl.rayP.FilterType = Enum.RaycastFilterType.Exclude
+
+local function ctrlStop()
+    Ctrl.on = false
+    if Ctrl.creature then
+        local ch = Ctrl.creature:FindFirstChildOfClass("Humanoid")
+        if ch then ch.WalkSpeed = 16; ch.PlatformStand = false end
+        Ctrl.creature = nil
+    end
+    if Ctrl.bv then Ctrl.bv:Destroy(); Ctrl.bv = nil end
+    local h = hum(); if h then WS.CurrentCamera.CameraSubject = h end
 end
 
-T.Def:AddRightGroupbox("Anti Banana")
-T.Def:GetGroupbox and nil
-T.Def:AddRightGroupbox("Anti Banana"):AddButton("abnB", {
-    Text = "Delete Legs",
-    Func = function() task.spawn(abanRun) end,
-})
-T.Def:AddRightGroupbox("Anti Banana"):AddToggle("abnT", {
-    Text = "Auto Anti Banana", Default = false,
+local ctrlSec = TabMisc:CreateSection("Control Player")
+local ctrlToggle = ctrlSec:CreateToggle({
+    Name = "Control Player", CurrentValue = false, Flag = "ctrlT",
     Callback = function(on)
-        if on then
-            task.spawn(function()
-                while on do
-                    local c = chr(); local h = c and c:FindFirstChildOfClass("Humanoid")
-                    if c and h and h.Health > 0 and c:FindFirstChild("Left Leg") and c:FindFirstChild("Right Leg") then
-                        pcall(abanRun); task.wait(0.5)
-                    else task.wait(0.2) end
-                end
-            end)
-        end
+        if not on then ctrlStop(); return end
+        local me = chr(); local mh = hrp()
+        if not me or not mh then return end
+        local head = me:FindFirstChild("Head"); if not head then return end
+        Ctrl.rayP.FilterDescendantsInstances = { me }
+        local hit = WS:Raycast(head.Position, WS.CurrentCamera.CFrame.LookVector * 100, Ctrl.rayP)
+        if not hit then return end
+        local tgt = hit.Instance
+        while tgt and not tgt:FindFirstChildOfClass("Humanoid") do tgt = tgt.Parent end
+        if not tgt then return end
+        local th = tgt.Humanoid; local t = tgt:FindFirstChild("HumanoidRootPart")
+        if not th or not t or th.Health <= 0 then return end
+        sno(t); line(t)
+        th.WalkSpeed = 0
+        Ctrl.creature = tgt; Ctrl.on = true
+        local bv = Instance.new("BodyVelocity", mh)
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge); bv.Velocity = Vector3.zero
+        Ctrl.bv = bv
+        WS.CurrentCamera.CameraSubject = th
+        local conn = RS.Heartbeat:Connect(function()
+            if not Ctrl.on or not th.Parent or not hum() then conn:Disconnect(); return end
+            bv.Velocity = hum().MoveDirection * 20
+            t.CFrame = mh.CFrame + Vector3.new(0, -3, 0)
+        end)
+        local jc = UIS.JumpRequest:Connect(function()
+            if Ctrl.on and th.Parent then th:ChangeState(Enum.HumanoidStateType.Jumping) end
+        end)
+        task.spawn(function()
+            while Ctrl.on and th.Parent and th.Health > 0 do task.wait() end
+            jc:Disconnect(); if conn.Connected then conn:Disconnect() end; ctrlStop()
+        end)
+    end,
+})
+ctrlSec:CreateKeybind({
+    Name = "Control Bind", CurrentKeybind = "V", HoldToInteract = false, Flag = "ctrlB",
+    Callback = function()
+        local next = not Ctrl.on
+        pcall(function() ctrlToggle:Set(next) end)
     end,
 })
 
--- === Water Walk ===
-T.Misc:AddRightGroupbox("Water Walk")
-T.Misc:GetGroupbox and nil
-T.Misc:AddRightGroupbox("Water Walk"):AddToggle("wwT", {
-    Text = "Water Walk", Default = false,
+-- Water Walk
+local wwSec = TabMisc:CreateSection("Water Walk")
+wwSec:CreateToggle({
+    Name = "Water Walk", CurrentValue = false, Flag = "wwT",
     Callback = function(on)
         local m = WS:FindFirstChild("Map")
         local a = m and m:FindFirstChild("AlwaysHereTweenedObjects")
@@ -950,16 +979,9 @@ T.Misc:AddRightGroupbox("Water Walk"):AddToggle("wwT", {
     end,
 })
 
--- === Util ===
-T.Misc:AddRightGroupbox("Util")
-T.Misc:GetGroupbox and nil
-T.Misc:AddRightGroupbox("Util"):AddButton("rejoinB", {
-    Text = "Rejoin",
-    Func = function() TS:TeleportToPlaceInstance(game.PlaceId, game.JobId, LP) end,
-})
-T.Misc:AddRightGroupbox("Util"):AddButton("unloadB", {
-    Text = "Unload",
-    Func = function() pcall(function() Library:Unload() end) end,
-})
+-- Util
+local utilSec = TabMisc:CreateSection("Util")
+utilSec:CreateButton({ Name = "Rejoin", Callback = function() TS:TeleportToPlaceInstance(game.PlaceId, game.JobId, LP) end })
+utilSec:CreateButton({ Name = "Unload", Callback = function() pcall(function() Rayfield:Destroy() end) end })
 
-Library:Notify({ Title = "bench", Description = "loaded", Time = 3 })
+notify("bench", "loaded", 3)
