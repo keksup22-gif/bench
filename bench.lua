@@ -44,6 +44,7 @@ local DT = MT:WaitForChild("DestroyToy")
 local SE = REP:WaitForChild("PlayerEvents"):WaitForChild("StickyPartEvent")
 local BE = REP:WaitForChild("BombEvents"):WaitForChild("BombExplode")
 
+-- ИСПРАВЛЕНИЕ: иконки теперь строки "rbxassetid://..."
 local W = Rayfield:CreateWindow({
     Name = "bench",
     LoadingTitle = "bench",
@@ -52,12 +53,12 @@ local W = Rayfield:CreateWindow({
     KeySystem = false,
 })
 
-local TabTgt  = W:CreateTab("Target")
-local TabBlob = W:CreateTab("Blobman")
-local TabDef  = W:CreateTab("Defense")
-local TabVis  = W:CreateTab("Visual")
-local TabSrv  = W:CreateTab("Server")
-local TabMisc = W:CreateTab("Misc")
+local TabTgt  = W:CreateTab("Target", "rbxassetid://4483362458")
+local TabBlob = W:CreateTab("Blobman", "rbxassetid://4483362458")
+local TabDef  = W:CreateTab("Defense", "rbxassetid://4483362458")
+local TabVis  = W:CreateTab("Visual", "rbxassetid://4483362458")
+local TabSrv  = W:CreateTab("Server", "rbxassetid://4483362458")
+local TabMisc = W:CreateTab("Misc", "rbxassetid://4483362458")
 
 local S = { target = nil }
 
@@ -69,7 +70,9 @@ local function thum(p) local c = p and p.Character; return c and c:FindFirstChil
 local function inv() return WS:FindFirstChild(LP.Name .. "SpawnedInToys") end
 local function zer(b) if b then b.AssemblyLinearVelocity = Vector3.zero; b.AssemblyAngularVelocity = Vector3.zero end end
 local function sno(b) if b then pcall(function() SNO:FireServer(b, b.CFrame) end) end end
-local function line(b) if b then pcall(function() CL:FireServer(b, Vector3.zero, b.Position, false) end) end end
+
+-- ИСПРАВЛЕНИЕ: передаем b.CFrame вместо Vector3.zero, чтобы не крашить CharacterAndBeamMove
+local function line(b) if b then pcall(function() CL:FireServer(b, b.CFrame) end) end end 
 local function kline(b) if b then pcall(function() DL:FireServer(b) end) end end
 local function owned(b) local o = b and b:FindFirstChild("PartOwner"); return o and o.Value == LP.Name end
 local function vis(on)
@@ -89,7 +92,7 @@ local function pick(s)
 end
 local function notify(t, d, dur)
     pcall(function()
-        Rayfield:Notify({ Title = tostring(t or "bench"), Content = tostring(d or ""), Duration = dur or 3, Image = 4483362458 })
+        Rayfield:Notify({ Title = tostring(t or "bench"), Content = tostring(d or ""), Duration = dur or 3, Image = "rbxassetid://4483362458" })
     end)
 end
 
