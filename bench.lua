@@ -1,3 +1,30 @@
+-- Загрузка Rayfield с защитой от блокировки
+local Rayfield
+local lib_urls = {
+    "https://raw.githubusercontent.com/Footagesus/Rayfield/main/source.lua",
+    "https://sirius.menu/rayfield",
+    "https://raw.githubusercontent.com/Footagesus/Rayfield/main/Rayfield.lua"
+}
+
+for _, url in ipairs(lib_urls) do
+    local ok, res = pcall(function()
+        local src = game:HttpGet(url)
+        if not src or src == "" then return nil end
+        return loadstring(src)()
+    end)
+    if ok and type(res) == "table" and res.CreateWindow then
+        Rayfield = res
+        print("[bench] library loaded from: " .. url)
+        break
+    end
+end
+
+if not Rayfield then
+    warn("[bench] CRITICAL: Could not load Rayfield UI. Executor blocked HTTP requests.")
+    return
+end
+
+-- ... дальше весь остальной код без изменений ...
 -- bench.lua — Rayfield version, one file
 local P  = game:GetService("Players")
 local RS = game:GetService("RunService")
