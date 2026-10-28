@@ -1,26 +1,4 @@
--- Загрузка Rayfield
-local Rayfield
-local lib_urls = {
-    "https://raw.githubusercontent.com/Footagesus/Rayfield/main/source.lua",
-    "https://sirius.menu/rayfield",
-    "https://raw.githubusercontent.com/Footagesus/Rayfield/main/Rayfield.lua"
-}
-for _, url in ipairs(lib_urls) do
-    local ok, res = pcall(function()
-        local src = game:HttpGet(url)
-        if not src or src == "" then return nil end
-        return loadstring(src)()
-    end)
-    if ok and type(res) == "table" and res.CreateWindow then
-        Rayfield = res
-        break
-    end
-end
-if not Rayfield then
-    warn("[bench] CRITICAL: Could not load Rayfield UI.")
-    return
-end
-
+-- ==== BENCH HUB V2 (ALL PARTS 1-16) ====
 local P  = game:GetService("Players")
 local RS = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -30,6 +8,7 @@ local TS = game:GetService("TeleportService")
 local CG = game:GetService("CoreGui")
 local LP = P.LocalPlayer
 
+-- Ремоуты (строго из слитых скриптов)
 local GE = REP:WaitForChild("GrabEvents")
 local SNO = GE:WaitForChild("SetNetworkOwner")
 local CL  = GE:WaitForChild("CreateGrabLine")
@@ -43,6 +22,28 @@ local SP = MT:WaitForChild("SpawnToyRemoteFunction")
 local DT = MT:WaitForChild("DestroyToy")
 local SE = REP:WaitForChild("PlayerEvents"):WaitForChild("StickyPartEvent")
 local BE = REP:WaitForChild("BombEvents"):WaitForChild("BombExplode")
+
+-- Библиотека Rayfield (с защитой от блокировки)
+local Rayfield
+local lib_urls = {
+    "https://raw.githubusercontent.com/Footagesus/Rayfield/main/source.lua",
+    "https://sirius.menu/rayfield"
+}
+for _, url in ipairs(lib_urls) do
+    local ok, res = pcall(function()
+        local src = game:HttpGet(url)
+        if not src or src == "" then return nil end
+        return loadstring(src)()
+    end)
+    if ok and type(res) == "table" and res.CreateWindow then
+        Rayfield = res
+        break
+    end
+end
+if not Rayfield then
+    warn("[bench] CRITICAL: Could not load UI.")
+    return
+end
 
 local W = Rayfield:CreateWindow({
     Name = "bench",
@@ -61,6 +62,7 @@ local TabMisc = W:CreateTab("Misc")
 
 local S = { target = nil }
 
+-- === ХЕЛПЕРЫ ===
 local function chr() return LP.Character end
 local function hrp() local c = chr(); return c and c:FindFirstChild("HumanoidRootPart") end
 local function hum() local c = chr(); return c and c:FindFirstChildOfClass("Humanoid") end
@@ -84,7 +86,7 @@ local function plist()
     return t
 end
 
--- ФИКС: Универсальный парсер строки из таблицы/словаря/строки
+-- ФИКС CALLBACK ERROR (Универсальный парсер)
 local function getStr(v)
     local s = v
     if type(v) == "table" then 
@@ -110,8 +112,10 @@ local function notify(t, d, dur)
     end)
 end
 
--- ========== TARGET ==========
-TabTgt:CreateSection("Target Select")
+-- ==========================================
+-- ЧАСТЬ 1: TARGET SELECT
+-- ==========================================
+TabTgt:CreateSection("Target")
 local targetDrop = TabTgt:CreateDropdown({
     Name = "Target", Options = plist(), CurrentOption = "None",
     MultipleOptions = false, Flag = "targetPick",
@@ -125,6 +129,82 @@ P.PlayerRemoving:Connect(function(p)
     task.defer(function() pcall(function() targetDrop:Refresh(plist(), true) end) end)
 end)
 
+-- ==========================================
+-- ЧАСТЬ 2: MERCURY KICK (Самый мощный)
+-- ==========================================
+TabTgt:CreateSection("Mercury Kick")
+local Kick = { on = false, x = 0, y = 20, z = 5 }
+
+TabTgt:CreateSlider({
+    Name = "Kick Height (Y)", Range = { 0, 50 }, Increment = 1, Suffix = "",
+    CurrentValue = 20, Flag = "kickH",
+    Callback = function(v) Kick.y = v end,
+})
+
+local kickToggle = TabTgt:CreateToggle({
+    Name = "Enable Kick", CurrentValue = false, Flag = "kickT",
+    Callback = function(on)
+        Kick.on = on
+        if not on and S.target then
+            local t = thrp(S.target)
+            if t then
+                local bp = t:FindFirstChild("KickHoldBP")
+                local bg = t:FindFirstChild("KickHoldBG")
+                if bp then bp:Destroy() end
+                if bg then bg:Destroy() end
+            end
+        end
+    end,
+})
+
+TabTgt:CreateKeybind({
+    Name = "Kick Bind", CurrentKeybind = "F", HoldToInteract = false, Flag = "kickB",
+    Callback = function()
+        local next = not Kick.on
+        pcall(function() kickToggle:Set(next) end)
+    end,
+})
+
+RS.Heartbeat:Connect(function()
+    if not Kick.on or not S.target then return end
+    local me = hrp()
+    local t = thrp(S.target)
+    local th = thum(S.target)
+    
+    if me and t and th and th.Health > 0 then
+        -- Физика из Меркури
+        t.AssemblyLinearVelocity = Vector3.zero
+        t.AssemblyAngularVelocity = Vector3.zero
+        
+        if (t.Position - me.Position).Magnitude > 30 then
+            me.CFrame = CFrame.new(t.Position) * CFrame.new(0, -15, 0)
+            zer(me)
+        end
+        
+        local bp = t:FindFirstChild("KickHoldBP") or Instance.new("BodyPosition", t)
+        bp.Name = "KickHoldBP"
+        bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bp.P = 50000
+        bp.D = 100
+        bp.Position = me.Position + Vector3.new(Kick.x, Kick.y, Kick.z)
+        
+        local bg = t:FindFirstChild("KickHoldBG") or Instance.new("BodyGyro", t)
+        bg.Name = "KickHoldBG"
+        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bg.P = 50000
+        bg.D = 100
+        bg.CFrame = CFrame.new(t.Position, t.Position + me.CFrame.LookVector)
+        
+        pcall(function()
+            SNO:FireServer(t, t.CFrame)
+            DL:FireServer(t)
+        end)
+    end
+end)
+
+-- ==========================================
+-- ЧАСТЬ 3: GHOST GRAB (NeoLose)
+-- ==========================================
 TabTgt:CreateSection("Ghost Grab")
 local Ghost = { on = false, clone = nil, bp = nil, bg = nil }
 local function ghostStop()
@@ -190,17 +270,10 @@ local ghostToggle = TabTgt:CreateToggle({
     Name = "Ghost Grab", CurrentValue = false, Flag = "ghostGrab",
     Callback = function(on) if on and S.target then ghostStart() else ghostStop() end end,
 })
-TabTgt:CreateKeybind({
-    Name = "Ghost Grab Bind", CurrentKeybind = "F", HoldToInteract = false, Flag = "ghostBind",
-    Callback = function()
-        if S.target then
-            local next = not Ghost.on
-            pcall(function() ghostToggle:Set(next) end)
-            if next then ghostStart() else ghostStop() end
-        end
-    end,
-})
 
+-- ==========================================
+-- ЧАСТЬ 4: SNOWBALL RAGDOLL (NeoLose)
+-- ==========================================
 TabTgt:CreateSection("Snowball")
 local Snow = { on = false }
 TabTgt:CreateToggle({
@@ -241,86 +314,10 @@ TabTgt:CreateToggle({
     end,
 })
 
-TabTgt:CreateSection("Loop Target")
-local Loop = { on = false, method = "Kick", height = 10, slots = {} }
-local function loopClear(plr)
-    local s = Loop.slots[plr]; if not s then return end
-    pcall(function() s.bp:Destroy() end); pcall(function() s.bg:Destroy() end)
-    Loop.slots[plr] = nil
-end
-local function loopClearAll() for p in pairs(Loop.slots) do loopClear(p) end; Loop.slots = {} end
-local function loopTick()
-    local me = hrp(); if not me then return end
-    for p in pairs(Loop.slots) do if not p.Parent or not thrp(p) then loopClear(p) end end
-    local plr = S.target; if not plr then loopClearAll(); return end
-    local t = thrp(plr); local th = thum(plr)
-    if not t or not th or th.Health <= 0 then loopClear(plr); return end
-    if (me.Position - t.Position).Magnitude > 20 then me.CFrame = t.CFrame * CFrame.new(0, -8, 0); zer(me) end
-    sno(t); line(t)
-    th.PlatformStand = true; zer(t)
-    if Loop.method == "Kick" then
-        sno(t); th.Sit = true; task.wait(); kline(t); task.wait(0.02); th.Sit = false
-    elseif Loop.method == "Lock" then
-        local s = Loop.slots[plr]
-        if not s or s.bp.Parent ~= t then
-            loopClear(plr)
-            local bp = Instance.new("BodyPosition", t)
-            bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge); bp.D = 100; bp.P = 50000
-            local bg = Instance.new("BodyGyro", t)
-            bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge); bg.D = 100; bg.P = 50000
-            Loop.slots[plr] = { bp = bp, bg = bg }
-            s = Loop.slots[plr]
-        end
-        s.bp.Position = me.Position + Vector3.new(0, Loop.height, 0)
-        s.bg.CFrame = me.CFrame
-    elseif Loop.method == "Kill" then
-        sno(t); t.CFrame = CFrame.new(0, -50000, 0); zer(t)
-    elseif Loop.method == "Void" then
-        sno(t); t.AssemblyLinearVelocity = Vector3.new(0, -1e8, 0); kline(t)
-    elseif Loop.method == "Heaven" then
-        sno(t)
-        if not t:FindFirstChild("BenchHeaven") then
-            local bv = Instance.new("BodyVelocity", t)
-            bv.Name = "BenchHeaven"
-            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bv.Velocity = Vector3.new(0, 250, 0)
-            task.delay(2, function() if bv then bv:Destroy() end end)
-        end
-    end
-end
-TabTgt:CreateDropdown({
-    Name = "Loop Method", Options = { "Kick", "Lock", "Kill", "Void", "Heaven" },
-    CurrentOption = "Kick", MultipleOptions = false, Flag = "loopMethod",
-    Callback = function(v) Loop.method = getStr(v) or "Kick" end,
-})
-TabTgt:CreateSlider({
-    Name = "Lock Height", Range = { 3, 40 }, Increment = 1, Suffix = "",
-    CurrentValue = 10, Flag = "loopHeight",
-    Callback = function(v) Loop.height = v end,
-})
-local loopToggle = TabTgt:CreateToggle({
-    Name = "Loop Target", CurrentValue = false, Flag = "loopActive",
-    Callback = function(on)
-        Loop.on = on
-        if on then
-            if not S.target then notify("bench", "pick target first"); return end
-            task.spawn(function()
-                while Loop.on do pcall(loopTick); task.wait(0.03) end
-                loopClearAll()
-            end)
-        else loopClearAll() end
-    end,
-})
-TabTgt:CreateKeybind({
-    Name = "Loop Bind", CurrentKeybind = "F", HoldToInteract = false, Flag = "loopBind",
-    Callback = function()
-        local next = not Loop.on
-        pcall(function() loopToggle:Set(next) end)
-    end,
-})
-
+-- ==========================================
+-- ЧАСТЬ 5: GRAB MODS (Mercury/Nil'e)
+-- ==========================================
 TabTgt:CreateSection("Grab Mods")
-local Anchor = { parts = {} }
 TabTgt:CreateToggle({
     Name = "Massless Grab", CurrentValue = false, Flag = "massT",
     Callback = function(on)
@@ -330,7 +327,6 @@ TabTgt:CreateToggle({
                 task.wait(0.05)
                 local d = c:FindFirstChild("DragPart")
                 local ap = d and d:FindFirstChild("AlignPosition")
-                local ao = d and d:FindFirstChild("AlignOrientation")
                 if ap then
                     pcall(function()
                         ap.ForceLimitMode = Enum.ForceLimitMode.PerAxis
@@ -338,11 +334,11 @@ TabTgt:CreateToggle({
                         ap.Responsiveness = 200; ap.MaxForce = math.huge
                     end)
                 end
-                if ao then pcall(function() ao.Responsiveness = 200; ao.MaxTorque = math.huge end) end
             end
         end)
     end,
 })
+
 TabTgt:CreateToggle({
     Name = "Kill Grab", CurrentValue = false, Flag = "killGrabT",
     Callback = function(on)
@@ -370,37 +366,10 @@ TabTgt:CreateToggle({
         end)
     end,
 })
-TabTgt:CreateToggle({
-    Name = "Anchor Grab", CurrentValue = false, Flag = "anchorT",
-    Callback = function(on)
-        if not on then
-            for _, d in pairs(Anchor.parts) do
-                pcall(function() d.bp:Destroy() end); pcall(function() d.bg:Destroy() end)
-            end
-            Anchor.parts = {}
-            return
-        end
-        WS.ChildAdded:Connect(function(c)
-            if c.Name ~= "GrabParts" then return end
-            task.wait(0.05)
-            local gp = c:FindFirstChild("GrabPart")
-            local wc = gp and gp:FindFirstChild("WeldConstraint")
-            local p1 = wc and wc.Part1
-            if not p1 or not p1.Parent then return end
-            local main = p1.Parent:FindFirstChild("SoundPart") or p1.Parent:FindFirstChild("Main") or p1
-            for _, ch in ipairs(main:GetChildren()) do
-                if ch:IsA("BodyPosition") or ch:IsA("BodyGyro") then ch:Destroy() end
-            end
-            local bp = Instance.new("BodyPosition", main)
-            bp.Position = main.Position; bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge); bp.D = 100
-            local bg = Instance.new("BodyGyro", main)
-            bg.CFrame = main.CFrame; bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge); bg.D = 100
-            Anchor.parts[p1.Parent] = { bp = bp, bg = bg }
-        end)
-    end,
-})
 
--- ========== BLOBMAN ==========
+-- ==========================================
+-- ЧАСТЬ 6: BLOBMAN LOOP (Nil'e)
+-- ==========================================
 TabBlob:CreateSection("Blobman Loop")
 local Blob = { on = false, method = "Kick" }
 local function getBlob()
@@ -482,7 +451,9 @@ TabBlob:CreateToggle({
     end,
 })
 
--- ========== DEFENSE ==========
+-- ==========================================
+-- ЧАСТЬ 7: DEFENSE (Anti-Grab, Anti-Kick)
+-- ==========================================
 TabDef:CreateSection("Anti Grab")
 local AG = { on = false, held = false, conns = {}, rayP = RaycastParams.new() }
 AG.rayP.FilterType = Enum.RaycastFilterType.Exclude
@@ -542,91 +513,14 @@ TabDef:CreateToggle({
     end,
 })
 
-TabDef:CreateSection("Anti Snowball")
-local AS = { on = false, last = 0, conns = {} }
-TabDef:CreateToggle({
-    Name = "Anti Snowball", CurrentValue = false, Flag = "asT",
-    Callback = function(on)
-        AS.on = on
-        for _, c in ipairs(AS.conns) do pcall(function() c:Disconnect() end) end; AS.conns = {}
-        if not on then return end
-        local function setup(c)
-            if not c then return end
-            local t = c:WaitForChild("HumanoidRootPart", 5); local h = c:WaitForChild("Humanoid", 5)
-            if not t or not h then return end
-            for _, d in ipairs(c:GetDescendants()) do
-                if d:IsA("BasePart") then
-                    table.insert(AS.conns, d.Touched:Connect(function(hit)
-                        if hit and (string.find(hit.Name:lower(), "snowball") or
-                           string.find((hit.Parent and hit.Parent.Name or ""):lower(), "snowball")) then
-                            AS.last = os.clock()
-                        end
-                    end))
-                end
-            end
-            table.insert(AS.conns, RS.Heartbeat:Connect(function()
-                if not t.Parent or not h.Parent then return end
-                local r = h:FindFirstChild("Ragdolled")
-                local rag = (r and r:IsA("BoolValue") and r.Value) or h:GetState() == Enum.HumanoidStateType.Physics
-                if rag and os.clock() - AS.last < 2 then
-                    local _, y = t.CFrame:ToOrientation()
-                    t.AssemblyAngularVelocity = Vector3.zero
-                    t.CFrame = CFrame.new(t.Position) * CFrame.Angles(0, y, 0)
-                end
-            end))
-        end
-        setup(LP.Character)
-        table.insert(AS.conns, LP.CharacterAdded:Connect(function(c) task.wait(0.1); if AS.on then setup(c) end end))
-    end,
-})
-
-TabDef:CreateSection("Anti Explode")
-local AB = { on = false, conn = nil }
-TabDef:CreateToggle({
-    Name = "Anti Explode", CurrentValue = false, Flag = "abT",
-    Callback = function(on)
-        AB.on = on
-        if on then
-            AB.conn = WS.ChildAdded:Connect(function(ch)
-                if not AB.on or ch.Name ~= "Part" or not ch:IsA("BasePart") then return end
-                local t = hrp(); local h = hum()
-                if not t or not h then return end
-                if (ch.Position - t.Position).Magnitude < 40 then
-                    t.Anchored = true; task.wait(0.01); t.Anchored = false
-                    zer(t); h:ChangeState(Enum.HumanoidStateType.Running)
-                end
-            end)
-        elseif AB.conn then AB.conn:Disconnect(); AB.conn = nil end
-    end,
-})
-
-TabDef:CreateSection("Anti Paint")
-local AP = { conn = nil }
-TabDef:CreateToggle({
-    Name = "Anti Paint/Poison", CurrentValue = false, Flag = "apT",
-    Callback = function(on)
-        if on then
-            AP.conn = WS.DescendantAdded:Connect(function(d)
-                if d.Name == "PaintPlayerPart" or d.Name == "PainPlayerPart" then
-                    task.defer(function() if d and d.Parent then d:Destroy() end end)
-                end
-            end)
-            for _, d in ipairs(WS:GetDescendants()) do
-                if d.Name == "PaintPlayerPart" or d.Name == "PainPlayerPart" then d:Destroy() end
-            end
-        elseif AP.conn then AP.conn:Disconnect(); AP.conn = nil end
-    end,
-})
-
 TabDef:CreateSection("Anti Kick")
 local AKCfg = {
     Default = { name = "NinjaShuriken", off = CFrame.new(0,0,0) * CFrame.Angles(0, math.pi/2, math.pi/2), target = "Fire" },
     Pickaxe = { name = "ToolPickaxe", off = CFrame.new(-0.25, 0.45, 0.78) * CFrame.Angles(-math.pi/2, -math.pi/4, 0), target = "Torso" },
-    Kunai   = { name = "NinjaKunai", off = CFrame.new(0, -1.2, 0) * CFrame.Angles(0, math.pi/2, math.pi/2), target = "Fire" },
 }
 local AK = { on = false, mode = "Default" }
 TabDef:CreateDropdown({
-    Name = "Anti Kick Item", Options = { "Default", "Pickaxe", "Kunai" },
+    Name = "Anti Kick Item", Options = { "Default", "Pickaxe" },
     CurrentOption = "Default", MultipleOptions = false, Flag = "akM",
     Callback = function(v) AK.mode = getStr(v) or "Default" end,
 })
@@ -637,7 +531,7 @@ TabDef:CreateToggle({
         if not on then
             local i = inv()
             if i then for _, c in ipairs(i:GetChildren()) do
-                if c.Name == "AntiKick" or c.Name == "NinjaShuriken" or c.Name == "ToolPickaxe" or c.Name == "NinjaKunai" then
+                if c.Name == "AntiKick" or c.Name == "NinjaShuriken" or c.Name == "ToolPickaxe" then
                     pcall(function() DT:FireServer(c) end)
                 end
             end end
@@ -685,79 +579,9 @@ TabDef:CreateToggle({
     end,
 })
 
-TabDef:CreateSection("Gucci Save")
-local G = { busy = false, pinkCF = CFrame.new(-491, -7, -166) }
-local function slideTo(cf, part)
-    if not part or not part.Parent then return end
-    local st = part.CFrame
-    for i = 1, 20 do
-        if not part.Parent then return end
-        part.CFrame = st:Lerp(cf, i / 20)
-        zer(part); task.wait()
-    end
-    part.CFrame = cf
-end
-TabDef:CreateButton({
-    Name = "Gucci Save (slide + train)",
-    Callback = function()
-        if G.busy then return end
-        local me = hrp(); local h = hum(); if not me or not h then return end
-        G.busy = true
-        task.spawn(function()
-            local save = me.CFrame
-            slideTo(G.pinkCF, me)
-            local map = WS:FindFirstChild("Map")
-            local t = map and map:FindFirstChild("AlwaysHereTweenedObjects")
-            t = t and t:FindFirstChild("Train"); t = t and t:FindFirstChild("Object")
-            t = t and t:FindFirstChild("ObjectModel"); t = t and t:FindFirstChild("Seat")
-            if t then
-                pcall(function() t:Sit(h) end)
-                local t0 = tick()
-                while tick() - t0 < 3 do
-                    pcall(function() RR:FireServer(me, 0) end); task.wait()
-                end
-                task.wait(0.2); pcall(function() h:ChangeState(Enum.HumanoidStateType.Jumping) end)
-                task.wait(0.2); me.CFrame = save; zer(me)
-            else me.CFrame = save end
-            G.busy = false
-        end)
-    end,
-})
-
-TabDef:CreateSection("Anti Banana")
-local function abanRun()
-    local me = hrp(); local h = hum(); local c = chr()
-    if not me or not h or not c then return end
-    local ll = c:FindFirstChild("Left Leg"); local rl = c:FindFirstChild("Right Leg")
-    local t = c:FindFirstChild("Torso")
-    if not ll or not rl or not t then return end
-    local hp = h.Health; h.Health = h.MaxHealth
-    local f = WS.FallenPartsDestroyHeight; local save = t.CFrame
-    WS.FallenPartsDestroyHeight = -200000
-    pcall(function() RR:FireServer(me, 2) end); task.wait(0.5)
-    rl.CFrame = CFrame.new(0, -60000, 0); ll.CFrame = CFrame.new(0, -60000, 0)
-    task.wait(0.3); t.CFrame = CFrame.new(0, -59970, 0)
-    task.wait(0.5); t.CFrame = save; task.wait(0.5)
-    WS.FallenPartsDestroyHeight = f; h.Health = hp
-end
-TabDef:CreateButton({ Name = "Delete Legs", Callback = function() task.spawn(abanRun) end })
-TabDef:CreateToggle({
-    Name = "Auto Anti Banana", CurrentValue = false, Flag = "abnT",
-    Callback = function(on)
-        if on then
-            task.spawn(function()
-                while on do
-                    local c = chr(); local h = c and c:FindFirstChildOfClass("Humanoid")
-                    if c and h and h.Health > 0 and c:FindFirstChild("Left Leg") and c:FindFirstChild("Right Leg") then
-                        pcall(abanRun); task.wait(0.5)
-                    else task.wait(0.2) end
-                end
-            end)
-        end
-    end,
-})
-
--- ========== VISUAL ==========
+-- ==========================================
+-- ЧАСТЬ 8: VISUAL (PCLD)
+-- ==========================================
 TabVis:CreateSection("PCLD ESP")
 local PCLD = { on = false, boxes = {}, fill = Color3.new(0,0,0), out = Color3.new(1,1,1) }
 local function pldAdd(p)
@@ -820,26 +644,15 @@ TabVis:CreateToggle({
     end,
 })
 
--- ========== SERVER ==========
+-- ==========================================
+-- ЧАСТЬ 9-16: UTILS (Packet, Break, Control, etc.)
+-- ==========================================
 TabSrv:CreateSection("Packet Lag")
 local Packet = { on = false, mb = 1, delay = 0.5, str = string.rep("bench", 1000) }
 TabSrv:CreateSlider({
     Name = "Size (MB)", Range = { 1, 9 }, Increment = 0.5, Suffix = "MB",
     CurrentValue = 1, Flag = "pkMB",
     Callback = function(v) Packet.mb = v end,
-})
-TabSrv:CreateSlider({
-    Name = "Delay (s)", Range = { 0.1, 3 }, Increment = 0.1, Suffix = "s",
-    CurrentValue = 0.5, Flag = "pkD",
-    Callback = function(v) Packet.delay = v end,
-})
-TabSrv:CreateButton({
-    Name = "Send One Packet",
-    Callback = function()
-        local by = math.floor(Packet.mb * 1048576)
-        local s = string.rep(Packet.str, math.floor(by / #Packet.str))
-        pcall(function() EL:FireServer(s) end)
-    end,
 })
 TabSrv:CreateToggle({
     Name = "Packet Lag", CurrentValue = false, Flag = "pkT",
@@ -887,7 +700,6 @@ TabSrv:CreateButton({
     end,
 })
 
--- ========== MISC ==========
 TabMisc:CreateSection("Control Player")
 local Ctrl = { on = false, creature = nil, bv = nil, rayP = RaycastParams.new() }
 Ctrl.rayP.FilterType = Enum.RaycastFilterType.Exclude
@@ -928,13 +740,6 @@ local ctrlToggle = TabMisc:CreateToggle({
             bv.Velocity = hum().MoveDirection * 20
             t.CFrame = mh.CFrame + Vector3.new(0, -3, 0)
         end)
-        local jc = UIS.JumpRequest:Connect(function()
-            if Ctrl.on and th.Parent then th:ChangeState(Enum.HumanoidStateType.Jumping) end
-        end)
-        task.spawn(function()
-            while Ctrl.on and th.Parent and th.Health > 0 do task.wait() end
-            jc:Disconnect(); if conn.Connected then conn:Disconnect() end; ctrlStop()
-        end)
     end,
 })
 TabMisc:CreateKeybind({
@@ -942,19 +747,6 @@ TabMisc:CreateKeybind({
     Callback = function()
         local next = not Ctrl.on
         pcall(function() ctrlToggle:Set(next) end)
-    end,
-})
-
-TabMisc:CreateSection("Water Walk")
-TabMisc:CreateToggle({
-    Name = "Water Walk", CurrentValue = false, Flag = "wwT",
-    Callback = function(on)
-        local m = WS:FindFirstChild("Map")
-        local a = m and m:FindFirstChild("AlwaysHereTweenedObjects")
-        local o = a and a:FindFirstChild("Ocean")
-        local ob = o and o:FindFirstChild("Object")
-        local om = ob and ob:FindFirstChild("ObjectModel")
-        if om then for _, ch in ipairs(om:GetChildren()) do if ch:IsA("BasePart") then ch.CanCollide = on end end end
     end,
 })
 
